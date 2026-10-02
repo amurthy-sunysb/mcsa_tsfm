@@ -13,6 +13,7 @@ Output:
 
 Usage:
     python convert_IEEE_mat.py struct_r1b_R1.mat [more .mat files ...] [--out-dir data/IEEE]
+                               [--start 150000 --n-samples 3000]
 """
 
 import argparse
@@ -37,13 +38,16 @@ def broken_bars_from_condition(condition: str) -> int:
     raise ValueError(f"Unrecognised condition name '{condition}'.")
 
 
-def convert_mat_file(mat_path: str, signals_dir: str) -> list[dict]:
+def convert_mat_file(mat_path: str, signals_dir: str, start: int = 0,
+                     n_samples: int | None = None) -> list[dict]:
     """
     Writes one CSV per recording in a single .mat file.
 
     Args:
         mat_path (str): Path to the v7.3 .mat file.
         signals_dir (str): Directory to write the CSV files into.
+        start (int): First sample to export. The motor is off for the first ~2 s (100,000 samples).
+        n_samples (int | None): Number of samples to export from 'start' (None exports to the end).
 
     Returns:
         list[dict]: One label row per recording written.
@@ -60,9 +64,10 @@ def convert_mat_file(mat_path: str, signals_dir: str) -> list[dict]:
             n_reps = group[CURRENT_SIGNALS[0]].shape[0]
 
             for rep in range(n_reps):
-                currents = [f[group[s][rep, 0]][()].ravel() for s in CURRENT_SIGNALS]
+                stop = None if n_samples is None else start + n_samples
+                currents = [f[group[s][rep, 0]][()].ravel()[start:stop] for s in CURRENT_SIGNALS]
                 n = min(len(c) for c in currents)
-                data = np.column_stack([np.arange(n)] + [c[:n] for c in currents])
+                data = np.column_stack([np.arange(start, start + n)] + [c[:n] for c in currents])
 
                 file_name = f"{condition}_{load}_{rep + 1:02d}.csv"
                 np.savetxt(os.path.join(signals_dir, file_name), data,
@@ -85,6 +90,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("mat_files", nargs="+", help="One or more struct_*.mat files.")
     parser.add_argument("--out-dir", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "IEEE"))
+    parser.add_argument("--start", type=int, default=0, help="First sample to export (default 0).")
+    parser.add_argument("--n-samples", type=int, default=None, help="Samples to export per recording (default all).")
     args = parser.parse_args()
 
     signals_dir = os.path.join(args.out_dir, "signals")
@@ -93,7 +100,7 @@ def main():
 
     new_rows = []
     for mat_path in args.mat_files:
-        new_rows.extend(convert_mat_file(mat_path, signals_dir))
+        new_rows.extend(convert_mat_file(mat_path, signals_dir, args.start, args.n_samples))
     new_labels = pd.DataFrame(new_rows)
 
     # Keep labels from previously converted files, replacing any that were re-converted

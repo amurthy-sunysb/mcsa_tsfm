@@ -14,3 +14,7 @@ wheels/
 *.json
 *.xml
 data/*
+
+*.zip
+
+.DS_Store

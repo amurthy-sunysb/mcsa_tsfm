@@ -83,7 +83,7 @@ The folder name must be `data/IEEE`, with capital letters. `IEEE/prepare_IEEE.py
 
 Each `.mat` file gives about 2.5 GB of CSV files. You can convert one `.mat` file at a time. The command keeps the labels from earlier conversions.
 
-**3. Run the notebook.** Open `notebooks/IEEE_TSFRESH.ipynb` and run all cells. The notebook divides each recording into windows. Then it makes one DataFrame for each phase current: `df_a`, `df_b` and `df_c`. The notebook does not extract features or train a classifier yet.
+**3. Run the notebook.** Open `notebooks/IEEE_data_preparation.ipynb` and run all cells. The notebook divides each recording into windows. Then it makes one DataFrame for each phase current: `df_a`, `df_b` and `df_c`. The notebook does not extract features or train a classifier yet.
 
 `MAX_WINDOWS` sets the maximum number of windows from each recording. The default is 200. If you set it to `None`, the notebook uses all windows (1,954 for each recording), but the DataFrames are much larger.
 
@@ -129,5 +129,5 @@ Each DataFrame has 5 metadata columns (`file_name`, `window_num`, `window_size`,
 | `IEEE/prepare_IEEE.py` | Reads the CSV files and `labels.csv`, and makes the windows with `common/windowing.py` |
 | `common/windowing.py` | Divides a signal into windows and averages the samples in each window. LIAS uses the same functions. |
 | `common/tsfresh_features.py` | Extracts tsfresh features. LIAS uses the same function. |
-| `notebooks/IEEE_TSFRESH.ipynb` | Makes the windows and the DataFrames |
+| `notebooks/IEEE_data_preparation.ipynb` | Makes the windows and the DataFrames |
 | `.claude/skills/working-with-ieee-rotor-dataset/` | A Claude Code skill with the same facts, for later sessions |

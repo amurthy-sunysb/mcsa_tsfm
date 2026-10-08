@@ -1,5 +1,6 @@
 """
-This file contains the functions needed for calculating TSFresh features for the LIAS dataset.
+This file contains the functions needed for calculating TSFresh features on windowed
+time series (one row per window, samples in 'sample_*' columns). Not tied to a dataset.
 """
 
 from tsfresh import extract_features

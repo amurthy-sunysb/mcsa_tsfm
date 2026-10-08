@@ -60,7 +60,7 @@ def main():
     WINDOW_SIZE = 1024
     OVERLAP = int(WINDOW_SIZE/2)
 
-    from prepare_LIAS import process_all_LIAS_files
+    from LIAS.prepare_LIAS import process_all_LIAS_files
     import pandas as pd
     
     model = MOMENTPipeline.from_pretrained(

@@ -18,9 +18,9 @@ This writes one CSV per recording to `data/IEEE/signals/` and the class labels t
 
 **3. Run the notebook.** Run all cells of `notebooks/IEEE_data_preparation.ipynb`. It produces one DataFrame of windows per phase: `df_a`, `df_b` and `df_c`. `MAX_WINDOWS` (default 200) sets how many windows it keeps from each recording.
 
-## Before you use the windows
+## Known problems in the data
 
-- **The motor is off for the first 2 s** (samples 0–100,000), then starts up until about 2.3 s. Use only windows that start at sample 150,000 or later.
+- **The motor is off for the first 2 s**, then starts up. The notebook skips everything before sample 160,000 (3.2 s), set by `STEADY_STATE_START` in `IEEE/IEEE_constants.py`.
 - **`rs_torque05_09` has no motor current**, only sensor noise. Remove it.
 
 ## Small test set
@@ -28,7 +28,7 @@ This writes one CSV per recording to `data/IEEE/signals/` and the class labels t
 To make small CSVs that you can commit, for checking that the code runs:
 
 ```bash
-uv run python IEEE/convert_IEEE_mat.py data/struct_*.mat --start 150000 --n-samples 3000
+uv run python IEEE/convert_IEEE_mat.py data/struct_*.mat --start 160000 --n-samples 3000
 git add -f data/IEEE
 ```
 

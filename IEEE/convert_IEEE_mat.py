@@ -13,7 +13,7 @@ Output:
 
 Usage:
     python IEEE/convert_IEEE_mat.py struct_r1b_R1.mat [more .mat files ...] [--out-dir data/IEEE]
-                                    [--start 150000 --n-samples 3000]
+                                    [--start 160000 --n-samples 3000]
 """
 
 import argparse

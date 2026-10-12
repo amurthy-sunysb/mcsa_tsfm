@@ -32,7 +32,7 @@ For the IEEE dataset, see [IEEE.md](IEEE.md) and [IEEE_dataset.md](IEEE_dataset.
 | Sample rate | 1,429 Hz (one sample each 0.7 ms) | 50,000 Hz |
 | Length of one file | 13,347 samples, 9.3 s | 1,001,000 samples, 20 s |
 | Windows for each file | 25, all of them | 1,954 available. `max_windows` keeps the first 200 (default). |
-| Part of the file it uses | All of it | Only the samples the kept windows need: the first 102,912 samples with 200 windows |
+| Part of the file it uses | All of it | From sample 160,000 (3.2 s). With 200 windows, samples 160,000 to 262,912. |
 | Time in one window | 0.72 s, about 43 supply cycles | 20.5 ms, about 1.2 supply cycles |
 | Sample rate after averaging | 714 Hz | 25,000 Hz |
 
@@ -44,13 +44,13 @@ The windows have the same number of samples, but a LIAS window is 35 times longe
 
 Thus the features from the two datasets measure different things, even with the same tsfresh function. For example, the FFT of a LIAS window gives one value each 1.4 Hz. The FFT of an IEEE window gives one value each 48.8 Hz.
 
-### IEEE uses only the start of each recording
+### IEEE skips the motor start
 
-With `max_windows=200`, the IEEE prepare step uses samples 0 to 102,912, which is 0 to 2.06 s. The motor is off for the first 2 s of each IEEE recording. Thus almost all of these windows contain only sensor noise.
+The motor is off for the first 2 s of each IEEE recording, then starts up. In one recording (`rs_torque15_10`), the startup lasts until about sample 151,800. Thus the IEEE prepare step skips all samples before sample 160,000 (3.2 s). The value is `STEADY_STATE_START` in `IEEE/IEEE_constants.py`.
 
-LIAS uses each full file, so LIAS does not have this problem.
+The CSV files keep the original sample number in column 0, so the skip also works for the small test set. Export the test set with `--start 160000`. If a CSV has no full window after sample 160,000, the prepare step stops with an error.
 
-If you use the full-length IEEE CSV files, add a start sample (for example 160,000) before the windowing. The 3000-sample IEEE test set does not have this problem, because the convert script exports it from sample 150,000.
+LIAS uses each full file and does not skip any samples.
 
 ### The labels come from different places
 

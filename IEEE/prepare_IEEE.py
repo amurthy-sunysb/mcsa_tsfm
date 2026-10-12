@@ -8,14 +8,16 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
-from IEEE.IEEE_constants import IEEE_SIGNALS_PATH, IEEE_LABELS_PATH, ISA_COL, ISB_COL, ISC_COL
+from IEEE.IEEE_constants import (IEEE_SIGNALS_PATH, IEEE_LABELS_PATH, SAMPLE_COL, ISA_COL, ISB_COL, ISC_COL,
+                                 STEADY_STATE_START)
 from common.windowing import create_overlapping_windows, downsample_data
 
 DOWNSAMPLE_FACTORS = {512: 1, 1024: 2, 2048: 4}
 
 
 def process_single_file(filename: str, window_size: int, overlap: int,
-                        max_windows: int | None = None) -> tuple[list[dict], list[dict], list[dict]]:
+                        max_windows: int | None = None,
+                        start_sample: int = STEADY_STATE_START) -> tuple[list[dict], list[dict], list[dict]]:
     """
     Processes a single IEEE CSV file, extracts 'isa', 'isb', and 'isc' signals,
     creates overlapping windows, and downsamples them.
@@ -25,6 +27,7 @@ def process_single_file(filename: str, window_size: int, overlap: int,
         window_size (int): The size of the overlapping windows.
         overlap (int): The number of samples by which windows overlap.
         max_windows (int | None): Keep only the first this-many windows per signal (None keeps all).
+        start_sample (int): Skip samples before this one, i.e. the motor-off and startup part.
 
     Returns:
         tuple[list[dict], list[dict], list[dict]]: Three lists for 'isa', 'isb', and 'isc'.
@@ -35,8 +38,14 @@ def process_single_file(filename: str, window_size: int, overlap: int,
                          "window sizes: 512, 1024, or 2048.")
 
     df = pd.read_csv(os.path.join(IEEE_SIGNALS_PATH, filename), header=None,
-                     usecols=[ISA_COL, ISB_COL, ISC_COL])
-    df.columns = ["isa", "isb", "isc"]
+                     usecols=[SAMPLE_COL, ISA_COL, ISB_COL, ISC_COL])
+    df.columns = ["sample", "isa", "isb", "isc"]
+
+    # Column 0 holds the original sample number, so this also works for CSVs exported with --start
+    df = df[df["sample"] >= start_sample].drop(columns="sample").reset_index(drop=True)
+    if len(df) < window_size:
+        raise ValueError(f"{filename} has {len(df)} samples from sample {start_sample} on, "
+                         f"fewer than one window ({window_size}). Re-export it with --start {start_sample}.")
 
     # A full recording has ~1950 windows; only read as many samples as the kept windows need
     if max_windows is not None:
@@ -59,7 +68,8 @@ def process_single_file(filename: str, window_size: int, overlap: int,
 
 
 def process_all_IEEE_files(window_size: int, overlap: int,
-                           max_windows: int | None = None) -> tuple[list[dict], list[dict], list[dict]]:
+                           max_windows: int | None = None,
+                           start_sample: int = STEADY_STATE_START) -> tuple[list[dict], list[dict], list[dict]]:
     """
     Processes every recording listed in labels.csv.
 
@@ -67,6 +77,7 @@ def process_all_IEEE_files(window_size: int, overlap: int,
         window_size (int): The size of the overlapping windows.
         overlap (int): The number of samples by which windows overlap.
         max_windows (int | None): Keep only the first this-many windows per signal per file.
+        start_sample (int): Skip samples before this one, i.e. the motor-off and startup part.
 
     Returns:
         tuple[list[dict], list[dict], list[dict]]: Three lists containing processed
@@ -77,7 +88,7 @@ def process_all_IEEE_files(window_size: int, overlap: int,
 
     all_a, all_b, all_c = [], [], []
     for filename in tqdm(file_list, desc="Processing files"):
-        a, b, c = process_single_file(filename, window_size, overlap, max_windows)
+        a, b, c = process_single_file(filename, window_size, overlap, max_windows, start_sample)
         all_a.extend(a)
         all_b.extend(b)
         all_c.extend(c)

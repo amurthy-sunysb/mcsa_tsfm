@@ -27,12 +27,12 @@ def process_single_file(filename: str, window_size: int, overlap: int) -> tuple[
         each corresponding to 'isa', 'isb', and 'isc' signals. Each list
         contains dictionaries with 'data' (downsampled window) and 'metadata'.
     """
-    downsample_factors = {512: 1, 1024:2, 2048:4}
+    downsample_factors = {512: 1, 1024: 2, 2048: 4}
 
     if window_size not in downsample_factors.keys():
-        raise ValueError("Invalid window size. Please use one of the supported" \
+        raise ValueError("Invalid window size. Please use one of the supported"
                          "window sizes: 512, 1024, or 2048.")
-    
+
     df = pd.read_csv(os.path.join(LIAS_DATA_PATH, filename), header=None)
     df = df[[TIME_COL, ISA_COL, ISB_COL, ISC_COL]]
 
@@ -40,11 +40,9 @@ def process_single_file(filename: str, window_size: int, overlap: int) -> tuple[
     signal_types = ["isa", "isb", "isc"]
     processed_data_outputs = {signal: [] for signal in signal_types}
 
-
-    
-
     for signal_type in signal_types:
-        raw_windows = create_overlapping_windows(df[signal_type], window_size=window_size, overlap=overlap)
+        raw_windows = create_overlapping_windows(
+            df[signal_type], window_size=window_size, overlap=overlap)
         for i, window in enumerate(raw_windows):
             metadata = {
                 "file_name": filename,
@@ -53,7 +51,7 @@ def process_single_file(filename: str, window_size: int, overlap: int) -> tuple[
                 "overlap": overlap,
                 "signal_type": signal_type
             }
-            processed_data_outputs[signal_type].append({"data": downsample_data(window, downsample_factors[window_size] ), 
+            processed_data_outputs[signal_type].append({"data": downsample_data(window, downsample_factors[window_size]),
                                                         "metadata": metadata})
 
     return (processed_data_outputs["isa"],
@@ -74,8 +72,9 @@ def process_all_LIAS_files(window_size: int, overlap: int) -> tuple[list[dict], 
         windows and metadata for 'isa', 'isb', and 'isc' signals respectively.
     """
     # Get a list of all 'ccs*.csv' files in the data_path, excluding those with '(1)' or '(2)'
-    file_list = [f for f in os.listdir(LIAS_DATA_PATH) if f.startswith('ccs') and f.endswith('.csv')]
-    file_list.sort() # Sort the list for consistent processing order
+    file_list = [f for f in os.listdir(
+        LIAS_DATA_PATH) if f.startswith('ccs') and f.endswith('.csv')]
+    file_list.sort()  # Sort the list for consistent processing order
 
     print(f"Found {len(file_list)} files: {file_list}")
 
@@ -84,7 +83,8 @@ def process_all_LIAS_files(window_size: int, overlap: int) -> tuple[list[dict], 
     all_processed_windows_c = []
 
     for filename in tqdm(file_list, desc="Processing files"):
-        downs_a, downs_b, downs_c = process_single_file(filename, window_size, overlap)
+        downs_a, downs_b, downs_c = process_single_file(
+            filename, window_size, overlap)
         all_processed_windows_a.extend(downs_a)
         all_processed_windows_b.extend(downs_b)
         all_processed_windows_c.extend(downs_c)
@@ -98,11 +98,13 @@ def main():
     OVERLAP = int(WINDOW_SIZE/2)
 
     # Call the new function to process all files
-    all_processed_windows_a, all_processed_windows_b, all_processed_windows_c = process_all_LIAS_files(WINDOW_SIZE, OVERLAP)
+    all_processed_windows_a, all_processed_windows_b, all_processed_windows_c = process_all_LIAS_files(
+        WINDOW_SIZE, OVERLAP)
 
     print(f"Total processed windows for 'isa': {len(all_processed_windows_a)}")
     print(f"Total processed windows for 'isb': {len(all_processed_windows_b)}")
     print(f"Total processed windows for 'isc': {len(all_processed_windows_c)}")
+
 
 if __name__ == "__main__":
     main()

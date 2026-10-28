@@ -8,4 +8,4 @@ Applying Time Series Foundation Models for Motor Current Signature Analysis
 
 ## Data preparation
 
-Both datasets use the same windowing functions in `common/windowing.py`. The windows have the same number of samples, but a LIAS window covers 0.72 s and an IEEE window covers 20.5 ms. See [docs/data_preparation.md](docs/data_preparation.md) for the full comparison.
+Both datasets use the same windowing functions in `common/windowing.py`. The windows have the same number of samples, but a LIAS window covers 0.72 s and an IEEE window covers 20.5 ms. See [docs/IEEE.md](docs/IEEE.md#short-windows-and-broken-bars) for what this means.

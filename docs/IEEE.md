@@ -101,4 +101,4 @@ Broken bars cause small peaks at (1 ± 2s) × 60 Hz, where s is the slip. These 
 | `common/windowing.py` | Divides a signal into windows and averages the samples in each window. LIAS uses the same functions. |
 | `common/tsfresh_features.py` | Extracts tsfresh features. LIAS uses the same function. |
 | `notebooks/IEEE_data_preparation.ipynb` | Makes the windows and the DataFrames |
-| `.claude/skills/working-with-ieee-rotor-dataset/` | A Claude Code skill with the same facts, for later sessions |
+ons |

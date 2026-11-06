@@ -13,9 +13,6 @@ import numpy as np
 import torch
 from mantis.trainer import MantisTrainer
 
-# Mantis cuts each window into 32 pieces, so the length must divide by 32
-MANTIS_NUM_PATCHES = 32
-
 
 def get_embeddings_in_batches(data: List[Dict[str, Any]],
                               model: MantisTrainer,
@@ -42,10 +39,9 @@ def get_embeddings_in_batches(data: List[Dict[str, Any]],
     # (n_windows, 512) -> (n_windows, 1, 512): Mantis wants (samples, channels, length)
     x = np.asarray(time_series_data_only, dtype=np.float32)[:, np.newaxis, :]
 
-    if x.shape[2] % MANTIS_NUM_PATCHES != 0:
-        raise ValueError(f"Window length {x.shape[2]} is not a multiple of "
-                         f"{MANTIS_NUM_PATCHES}. Use a window size from prepare_LIAS.py "
-                         f"(512, 1024 or 2048), which are downsampled to 512.")
+    # Mantis splits each window into 32 patches, so the length must be a multiple of 32
+    if x.shape[2] % 32 != 0:
+        raise ValueError(f"Window length {x.shape[2]} is not a multiple of 32.")
 
     # transform() batches and turns off gradients itself, so no manual loop as in MOMENT
     embeddings = model.transform(x, batch_size=batch_size, to_numpy=False)

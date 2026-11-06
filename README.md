@@ -19,7 +19,3 @@ If you set up the environment before the pandas change below, run `uv sync` agai
 - **mantis-tsfm** (`>=1.1.0`) provides the Mantis models used in `notebooks/lias_demo_MANTIS.ipynb`. Pretrained weights download from Hugging Face on first use.
 - **momentfm** installs from the MOMENT GitHub repo (see `[tool.uv.sources]` in `pyproject.toml`).
 - **torch** comes from PyPI. On Windows that build is CPU-only; on Linux it includes CUDA. To use an NVIDIA GPU on Windows, install a CUDA build of torch into `.venv` (see [pytorch.org](https://pytorch.org/get-started/locally/)). The notebooks run on CPU, just more slowly.
-
-## Data
-
-The LIAS data goes in `data/LIAS/` (the path is set in `LIAS/LIAS_constants.py`). Everything under `data/` and all `.csv` files are git-ignored, so the data is never committed.

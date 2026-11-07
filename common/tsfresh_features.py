@@ -7,7 +7,27 @@ from tsfresh import extract_features
 from tsfresh.feature_extraction import MinimalFCParameters, ComprehensiveFCParameters
 import pandas as pd
 
+# Features that add no information for our windows, so they are dropped after extraction.
+# All windows have the same length, which makes:
+#   - value__length the same number for every window,
+#   - value__sum_values equal to value__mean * length (redundant with the mean),
+#   - value__variance equal to value__standard_deviation squared (redundant with the std).
+IRRELEVANT_FEATURES = ['value__sum_values', 'value__variance', 'value__length']
+
+
 def extract_tsfresh_features(df_phase: pd.DataFrame, phase_name: str):
+    """
+    Extracts TSFresh features for every window of one phase.
+
+    Args:
+        df_phase (pd.DataFrame): One row per window: the metadata columns plus the samples
+            in 'sample_0', 'sample_1', ... columns (see windows_to_dataframe()).
+        phase_name (str): Name of the phase, only used in the progress messages.
+
+    Returns:
+        pd.DataFrame: One row per window: the metadata columns followed by the TSFresh
+        features, without the ones listed in IRRELEVANT_FEATURES.
+    """
     print(f"Extracting TSFresh features for {phase_name}...")
 
     # Create a unique ID for each window (row)
@@ -49,6 +69,9 @@ def extract_tsfresh_features(df_phase: pd.DataFrame, phase_name: str):
                                    default_fc_parameters=combined_fc_parameters,
                                    n_jobs=0, # Set n_jobs to 0 for single process as intended
                                    show_warnings=False)
+
+    # Drop the features that add no information (see IRRELEVANT_FEATURES above)
+    features_df = features_df.drop(columns=IRRELEVANT_FEATURES, errors='ignore')
 
     # Reset the index of features_df to make 'id' a regular column for merging
     # Explicitly name the new column 'id'

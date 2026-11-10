@@ -1,10 +1,11 @@
 """
 Functions for the classification step of the experiments: splitting the windows into
-training and test sets, picking and scaling the features, training the models and
-evaluating them. They work on the merged table made by rename_and_merge().
+training and test sets, scaling the features, training the models and evaluating them.
+They work on the merged table made by rename_and_merge(), once add_labels_LIAS() has
+added the 'class' and 'file_group' columns.
 
-The train-test split only works on LIAS for now, because it needs to know which LIAS
-file belongs to which motor condition (see LIAS/LIAS_constants.py).
+The train-test split only works on LIAS for now, because it stratifies on the LIAS
+'file_group' column (condition and speed).
 """
 
 import numpy as np
@@ -15,7 +16,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-from LIAS.LIAS_constants import MOTOR_CONDITIONS_RANGES
 from common.feature_merging import FEATURE_TYPES
 
 
@@ -23,130 +23,48 @@ from common.feature_merging import FEATURE_TYPES
 # Train-test split (LIAS only, for now)
 # ---------------------------------------------------------------------------
 
-def generate_valid_files_list(motor_conditions_ranges: dict) -> list:
-    """
-    Generates a list of valid file names based on motor condition ranges.
-
-    Args:
-        motor_conditions_ranges (dict): A dictionary where keys are condition names
-            and values are range objects representing file indices.
-
-    Returns:
-        list: A list of file names (e.g., ['ccs0.csv', 'ccs1.csv', ...]).
-    """
-    valid_files = []
-    for r in motor_conditions_ranges.values():
-        for i in r:
-            valid_files.append(f"ccs{i}.csv")
-    return valid_files
-
-
-def generate_file_to_class_map(motor_conditions_ranges: dict) -> dict:
-    """
-    Generates a mapping from file names to their corresponding class labels.
-
-    Args:
-        motor_conditions_ranges (dict): A dictionary where keys are condition names
-            and values are range objects representing file indices.
-
-    Returns:
-        dict: A dictionary where keys are file names (e.g., 'ccs0.csv') and values
-            are class labels (1 for healthy, 2 for one broken, 3 for two broken).
-    """
-    file_to_class_map = {}
-
-    # Class 1: Healthy conditions
-    for key in ["healthy_low", "healthy_med", "healthy_high"]:
-        for i in motor_conditions_ranges[key]:
-            file_to_class_map[f"ccs{i}.csv"] = 1
-
-    # Class 2: One broken condition
-    for key in ["one_broken_low", "one_broken_med", "one_broken_high"]:
-        for i in motor_conditions_ranges[key]:
-            file_to_class_map[f"ccs{i}.csv"] = 2
-
-    # Class 3: Two broken conditions
-    for key in ["two_broken_low", "two_broken_med", "two_broken_high"]:
-        for i in motor_conditions_ranges[key]:
-            file_to_class_map[f"ccs{i}.csv"] = 3
-
-    return file_to_class_map
-
-
-def generate_file_to_group_map(motor_conditions_ranges: dict) -> dict:
-    """
-    Generates a mapping from file names to their corresponding group names.
-
-    Args:
-        motor_conditions_ranges (dict): A dictionary where keys are group names
-            and values are range objects representing file indices.
-
-    Returns:
-        dict: A dictionary where keys are file names (e.g., 'ccs0.csv') and values
-            are group names (e.g., 'healthy_low').
-    """
-    file_to_group_map = {}
-    for group_name, file_range in motor_conditions_ranges.items():
-        for i in file_range:
-            file_to_group_map[f"ccs{i}.csv"] = group_name
-
-    return file_to_group_map
-
-
 def train_test_split_LIAS(df: pd.DataFrame,
                           test_size: float = 0.2,
                           seed: int = 67) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Labels the LIAS windows and splits them into training and test sets, by file.
+    Splits the labelled LIAS windows into training and test sets, by file.
 
-    1. Keeps only the windows of the 132 files whose motor condition is known
-       (MOTOR_CONDITIONS_RANGES in LIAS/LIAS_constants.py).
-    2. Adds a 'class' column (1 = healthy, 2 = one broken bar, 3 = two broken bars) and
-       a 'file_group' column (condition and speed, e.g. 'healthy_low').
-    3. Splits the files, not the windows, into training and test sets, stratified on
-       'file_group'. All windows of a file land on the same side, and every
-       condition-and-speed group has the same share of files in both sets.
+    The files, not the windows, are split, stratified on 'file_group'. All windows of a
+    file land on the same side, and every condition-and-speed group has the same share of
+    files in both sets. Label the windows with add_labels_LIAS() first.
 
     Args:
-        df (pd.DataFrame): One row per window, with at least 'file_name' and 'window_num'
-            columns, e.g. the table returned by rename_and_merge().
+        df (pd.DataFrame): One row per window, with at least 'file_name', 'window_num' and
+            'file_group' columns, e.g. the table returned by add_labels_LIAS().
         test_size (float): Share of the files that go into the test set.
         seed (int): Seed for the random split. A different seed puts different files in
             the test set, so the experiment can be repeated with several seeds.
 
     Returns:
         tuple[pd.DataFrame, pd.DataFrame]: train_df and test_df: the rows of df that belong
-        to the training files and to the test files, with 'class' and 'file_group' added.
+        to the training files and to the test files.
 
     Raises:
-        ValueError: If df has no 'file_name' or 'window_num' column, if a window appears
-            more than once, or if a file ends up in both sets.
+        ValueError: If df has no 'file_name', 'window_num' or 'file_group' column, if a
+            window appears more than once, or if a file ends up in both sets.
     """
-    missing = [col for col in ["file_name", "window_num"] if col not in df.columns]
+    missing = [col for col in ["file_name", "window_num", "file_group"] if col not in df.columns]
     if missing:
-        raise ValueError(f"df has no {missing} column(s).")
+        hint = " add_labels_LIAS() adds 'file_group'." if "file_group" in missing else ""
+        raise ValueError(f"df has no {missing} column(s).{hint}")
     if df.duplicated(subset=["file_name", "window_num"]).any():
         raise ValueError("Each window (file_name, window_num) must appear only once in df.")
 
-    valid_files = generate_valid_files_list(MOTOR_CONDITIONS_RANGES)
-    file_to_class_map = generate_file_to_class_map(MOTOR_CONDITIONS_RANGES)
-    file_to_group_map = generate_file_to_group_map(MOTOR_CONDITIONS_RANGES)
-
-    # Keep only the files whose condition we know, and label their windows
-    df_valid = df[df["file_name"].isin(valid_files)].copy()
-    df_valid["class"] = df_valid["file_name"].map(file_to_class_map)
-    df_valid["file_group"] = df_valid["file_name"].map(file_to_group_map)
-
     # Split the files, not the windows. Windows of the same recording overlap and look alike,
     # so if some were in training and others in test, the test would be too easy.
-    file_df = df_valid[["file_name", "file_group"]].drop_duplicates()
+    file_df = df[["file_name", "file_group"]].drop_duplicates()
     train_files, test_files = train_test_split(file_df["file_name"],
                                                stratify=file_df["file_group"],
                                                test_size=test_size,
                                                random_state=seed)
 
-    train_df = df_valid[df_valid["file_name"].isin(train_files)]
-    test_df = df_valid[df_valid["file_name"].isin(test_files)]
+    train_df = df[df["file_name"].isin(train_files)]
+    test_df = df[df["file_name"].isin(test_files)]
 
     if set(train_df["file_name"]) & set(test_df["file_name"]):
         raise ValueError("A file ended up in both the training and the test set.")
@@ -158,17 +76,22 @@ def train_test_split_LIAS(df: pd.DataFrame,
 
 
 # ---------------------------------------------------------------------------
-# Features, labels and scaling
+# Scaling
 # ---------------------------------------------------------------------------
 
-def get_features_and_labels(train_df: pd.DataFrame,
-                            test_df: pd.DataFrame,
-                            feature_type: str) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+def scale_features(train_df: pd.DataFrame,
+                   test_df: pd.DataFrame,
+                   feature_type: str) -> tuple[np.ndarray, pd.Series, np.ndarray, pd.Series]:
     """
-    Takes the feature columns and the 'class' labels out of the training and test tables.
+    Picks the features of one type and standardizes them (mean 0, standard deviation 1).
 
     The feature columns are the ones named '<feature_type>_...', which is how
-    rename_and_merge() names them (e.g. 'moment_a_17').
+    rename_and_merge() names them (e.g. 'moment_a_17'). The scaler learns each feature's
+    mean and standard deviation from the training set only, then applies them to both
+    sets, so no information from the test set leaks into training.
+
+    There is no seed here because scaling is not random. The randomness of an
+    experiment is in the split: pass a different seed to train_test_split_LIAS().
 
     Args:
         train_df (pd.DataFrame): Training windows, with a 'class' column.
@@ -176,7 +99,7 @@ def get_features_and_labels(train_df: pd.DataFrame,
         feature_type (str): Which features to use: "tsfresh", "moment" or "mantis".
 
     Returns:
-        tuple: X_train, y_train, X_test, y_test, with the features not scaled.
+        tuple: X_train_scaled, y_train, X_test_scaled, y_test.
 
     Raises:
         ValueError: If feature_type is not supported, a table has no 'class' column, or
@@ -193,37 +116,11 @@ def get_features_and_labels(train_df: pd.DataFrame,
         raise ValueError(f"train_df has no '{feature_type}_...' columns. "
                          f"Is it really a {feature_type} table?")
 
-    return train_df[feature_cols], train_df["class"], test_df[feature_cols], test_df["class"]
-
-
-def scale_features(train_df: pd.DataFrame,
-                   test_df: pd.DataFrame,
-                   feature_type: str) -> tuple[np.ndarray, pd.Series, np.ndarray, pd.Series]:
-    """
-    Picks the features of one type and standardizes them (mean 0, standard deviation 1).
-
-    The scaler learns each feature's mean and standard deviation from the training set
-    only, then applies them to both sets, so no information from the test set leaks
-    into training.
-
-    There is no seed here because scaling is not random. The randomness of an
-    experiment is in the split: pass a different seed to train_test_split_LIAS().
-
-    Args:
-        train_df (pd.DataFrame): Training windows, with a 'class' column.
-        test_df (pd.DataFrame): Test windows, with a 'class' column.
-        feature_type (str): Which features to use: "tsfresh", "moment" or "mantis".
-
-    Returns:
-        tuple: X_train_scaled, y_train, X_test_scaled, y_test.
-    """
-    X_train, y_train, X_test, y_test = get_features_and_labels(train_df, test_df, feature_type)
-
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)  # learn each feature's mean and std on training data
-    X_test_scaled = scaler.transform(X_test)        # apply the same mean and std to the test data
+    X_train_scaled = scaler.fit_transform(train_df[feature_cols])  # learn each feature's mean and std on training data
+    X_test_scaled = scaler.transform(test_df[feature_cols])        # apply the same mean and std to the test data
 
-    return X_train_scaled, y_train, X_test_scaled, y_test
+    return X_train_scaled, train_df["class"], X_test_scaled, test_df["class"]
 
 
 # ---------------------------------------------------------------------------

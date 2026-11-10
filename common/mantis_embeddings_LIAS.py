@@ -10,12 +10,8 @@ The windows would usually be produced by the functions in `prepare_LIAS.py`.
 """
 from typing import List, Dict, Any, Tuple
 import numpy as np
-import pandas as pd
 import torch
 from mantis.trainer import MantisTrainer
-
-# Columns that identify a window; used to line the three phases up
-KEY_COLUMNS = ["file_name", "window_num"]
 
 
 def get_embeddings_in_batches(data: List[Dict[str, Any]],
@@ -53,26 +49,6 @@ def get_embeddings_in_batches(data: List[Dict[str, Any]],
     return embeddings.cpu(), metadata_only
 
 
-def embeddings_to_dataframe(embeddings: torch.Tensor,
-                            metadata: List[Dict[str, Any]]) -> pd.DataFrame:
-    """
-    Puts one phase's embeddings and metadata into a single table.
-
-    Args:
-        embeddings: Tensor of shape (n_windows, 256) from `get_embeddings_in_batches`.
-        metadata: The matching list of metadata dicts.
-
-    Returns:
-        A DataFrame with columns file_name, window_num and the features 0 to 255,
-        one row per window. The other metadata columns (window_size, overlap,
-        signal_type) are dropped, as in the MOMENT notebook.
-    """
-    embeddings_df = pd.DataFrame(embeddings.numpy())
-    metadata_df = pd.DataFrame(metadata)[KEY_COLUMNS]
-
-    return pd.concat([metadata_df, embeddings_df], axis=1)
-
-
 def main():
     if torch.backends.mps.is_available():
         device = "mps"
@@ -89,6 +65,7 @@ def main():
 
     from LIAS.prepare_LIAS import process_all_LIAS_files
     from mantis.architecture import MantisV1
+    import pandas as pd
 
     network = MantisV1(device=device).from_pretrained("paris-noah/Mantis-8M")
     model = MantisTrainer(device=device, network=network)
@@ -101,18 +78,24 @@ def main():
     print(f"Total processed windows for 'isc': {len(all_processed_windows_c)}")
 
     batch_size = 256 # You can adjust this based on your GPU memory
-    embeddings_a, metadata_a = get_embeddings_in_batches(all_processed_windows_a, model, batch_size=batch_size)
-    embeddings_b, metadata_b = get_embeddings_in_batches(all_processed_windows_b, model, batch_size=batch_size)
-    embeddings_c, metadata_c = get_embeddings_in_batches(all_processed_windows_c, model, batch_size=batch_size)
+    combined_embeddings, combined_metadata = get_embeddings_in_batches(all_processed_windows_a,
+                                                                       model,
+                                                                       batch_size=batch_size)
 
-    df_a = embeddings_to_dataframe(embeddings_a, metadata_a)
-    df_b = embeddings_to_dataframe(embeddings_b, metadata_b)
-    df_c = embeddings_to_dataframe(embeddings_c, metadata_c)
+    print(f"Shape of combined embeddings from batch processing: {combined_embeddings.shape}")
+    print(f"Number of combined metadata entries: {len(combined_metadata)}")
 
-    # 2 key columns + 256 feature columns per phase; the phases are merged with rename_and_merge
-    print(f"Shape of the per-phase DataFrames: {df_a.shape}, {df_b.shape}, {df_c.shape}")
-    print(df_a.head())
+    # Create a DataFrame for embeddings
+    embeddings_df = pd.DataFrame(combined_embeddings.numpy())
 
+    # Create a DataFrame for metadata
+    metadata_df = pd.DataFrame(combined_metadata)
+
+    # Concatenate embeddings and metadata
+    final_df = pd.concat([metadata_df, embeddings_df], axis=1)
+
+    print(f"Shape of the final DataFrame: {final_df.shape}")
+    print(final_df.head())
 
 if __name__ == "__main__":
     main()

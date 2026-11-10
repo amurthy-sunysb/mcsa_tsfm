@@ -42,18 +42,21 @@ def process_single_file(filename: str, window_size: int, overlap: int,
     df.columns = ["sample", "isa", "isb", "isc"]
 
     # Column 0 holds the original sample number, so this also works for CSVs exported with --start
-    df = df[df["sample"] >= start_sample].drop(columns="sample").reset_index(drop=True)
+    df = df[df["sample"] >= start_sample].drop(
+        columns="sample").reset_index(drop=True)
     if len(df) < window_size:
         raise ValueError(f"{filename} has {len(df)} samples from sample {start_sample} on, "
                          f"fewer than one window ({window_size}). Re-export it with --start {start_sample}.")
 
     # A full recording has ~1950 windows; only read as many samples as the kept windows need
     if max_windows is not None:
-        df = df.iloc[: window_size + (max_windows - 1) * (window_size - overlap)]
+        df = df.iloc[: window_size +
+                     (max_windows - 1) * (window_size - overlap)]
 
     outputs = {}
     for signal_type in df.columns:
-        raw_windows = create_overlapping_windows(df[signal_type], window_size=window_size, overlap=overlap)
+        raw_windows = create_overlapping_windows(
+            df[signal_type], window_size=window_size, overlap=overlap)
         outputs[signal_type] = [
             {"data": downsample_data(window, DOWNSAMPLE_FACTORS[window_size]),
              "metadata": {"file_name": filename,
@@ -88,7 +91,8 @@ def process_all_IEEE_files(window_size: int, overlap: int,
 
     all_a, all_b, all_c = [], [], []
     for filename in tqdm(file_list, desc="Processing files"):
-        a, b, c = process_single_file(filename, window_size, overlap, max_windows, start_sample)
+        a, b, c = process_single_file(
+            filename, window_size, overlap, max_windows, start_sample)
         all_a.extend(a)
         all_b.extend(b)
         all_c.extend(c)
@@ -98,15 +102,13 @@ def process_all_IEEE_files(window_size: int, overlap: int,
 
 def load_IEEE_labels() -> pd.DataFrame:
     """
-    Loads labels.csv and adds a 'file_group' column (condition + load) for stratified splitting.
+    Loads labels.csv.
 
     Returns:
         pd.DataFrame: One row per recording with file_name, condition, broken_bars,
-        load, repetition, class and file_group.
+        load, repetition and class.
     """
-    labels = pd.read_csv(IEEE_LABELS_PATH)
-    labels["file_group"] = labels["condition"] + "_" + labels["load"]
-    return labels
+    return pd.read_csv(IEEE_LABELS_PATH)
 
 
 def main():
@@ -114,7 +116,8 @@ def main():
     WINDOW_SIZE = 1024
     OVERLAP = int(WINDOW_SIZE / 2)
 
-    all_a, all_b, all_c = process_all_IEEE_files(WINDOW_SIZE, OVERLAP, max_windows=100)
+    all_a, all_b, all_c = process_all_IEEE_files(
+        WINDOW_SIZE, OVERLAP, max_windows=100)
 
     print(f"Total processed windows for 'isa': {len(all_a)}")
     print(f"Total processed windows for 'isb': {len(all_b)}")

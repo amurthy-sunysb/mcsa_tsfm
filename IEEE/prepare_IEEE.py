@@ -15,7 +15,7 @@ from common.windowing import create_overlapping_windows, downsample_data
 DOWNSAMPLE_FACTORS = {512: 1, 1024: 2, 2048: 4}
 
 
-def process_single_file(filename: str, window_size: int, overlap: int,
+def process_single_file(filename: str, class_label: str, window_size: int, overlap: int,
                         max_windows: int | None = None,
                         start_sample: int = STEADY_STATE_START) -> tuple[list[dict], list[dict], list[dict]]:
     """
@@ -59,11 +59,13 @@ def process_single_file(filename: str, window_size: int, overlap: int,
             df[signal_type], window_size=window_size, overlap=overlap)
         outputs[signal_type] = [
             {"data": downsample_data(window, DOWNSAMPLE_FACTORS[window_size]),
+             # {"data": window,
              "metadata": {"file_name": filename,
                           "window_num": i,
                           "window_size": window_size,
                           "overlap": overlap,
-                          "signal_type": signal_type}}
+                          "signal_type": signal_type,
+                          "class": class_label}}
             for i, window in enumerate(raw_windows)
         ]
 
@@ -92,7 +94,9 @@ def process_all_IEEE_files(window_size: int, overlap: int,
     all_a, all_b, all_c = [], [], []
     for filename in tqdm(file_list, desc="Processing files"):
         a, b, c = process_single_file(
-            filename, window_size, overlap, max_windows, start_sample)
+            filename, load_IEEE_labels().loc[load_IEEE_labels()[
+                "file_name"] == filename, "class"].values[0],
+            window_size, overlap, max_windows, start_sample)
         all_a.extend(a)
         all_b.extend(b)
         all_c.extend(c)

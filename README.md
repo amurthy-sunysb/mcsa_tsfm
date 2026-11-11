@@ -1,11 +1,28 @@
-# mcsa_tsfm
-Applying Time Series Foundation Models for Motor Current Signature Analysis
+# IEEE broken rotor bar dataset
 
-## Datasets
+Source: [IEEE DataPort](https://ieee-dataport.org/open-access/experimental-database-detecting-and-diagnosing-rotor-broken-bar-three-phase-induction) (DOI [10.21227/fmnm-bn95](https://doi.org/10.21227/fmnm-bn95)).
 
-- **IEEE broken rotor bar:** current signals from an induction motor with 0–4 broken rotor bars. See [docs/IEEE.md](docs/IEEE.md) for how to download, convert, and run it.
-- **LIAS:** three-phase current signals, in `data/LIAS/ccs*.csv`.
+## How to run
 
-## Data preparation
+1. Download the zip (free IEEE login) and put the `struct_*.mat` files in `data/`.
+2. Convert to CSV:
 
-Both datasets use the same windowing functions in `common/windowing.py`. The windows have the same number of samples, but a LIAS window covers 0.72 s and an IEEE window covers 20.5 ms. See [docs/IEEE.md](docs/IEEE.md#short-windows-and-broken-bars) for what this means.
+   ```bash
+   uv run python IEEE/convert_IEEE_mat.py data/struct_*.mat --start 150000
+   ```
+
+   Add `--n-samples 3000` for a quick test set (code check only, too short to detect broken bars).
+3. Run all cells in `notebooks/IEEE_data_preparation.ipynb`.
+
+Convert at least two rotors before training. Don't commit `data/`.
+
+## Files
+
+| File | Purpose |
+|---|---|
+| `IEEE/convert_IEEE_mat.py` | `.mat` → CSV + `labels.csv` |
+| `IEEE/IEEE_constants.py` | Paths and column numbers |
+| `IEEE/prepare_IEEE.py` | Loads CSVs and windows them |
+| `common/windowing.py` | Windowing and downsampling (shared with LIAS) |
+| `common/tsfresh_features.py` | tsfresh features (shared with LIAS) |
+| `notebooks/IEEE_data_preparation.ipynb` | Builds windows and DataFrames |

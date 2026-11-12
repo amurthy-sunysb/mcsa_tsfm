@@ -24,6 +24,7 @@ def process_single_file(filename: str, class_label: str, window_size: int, overl
 
     Args:
         filename (str): The name of the CSV file to process.
+        class_label (str): Class of the recording (from labels.csv), copied into each window's metadata.
         window_size (int): The size of the overlapping windows.
         overlap (int): The number of samples by which windows overlap.
         max_windows (int | None): Keep only the first this-many windows per signal (None keeps all).
@@ -48,7 +49,8 @@ def process_single_file(filename: str, class_label: str, window_size: int, overl
         raise ValueError(f"{filename} has {len(df)} samples from sample {start_sample} on, "
                          f"fewer than one window ({window_size}). Re-export it with --start {start_sample}.")
 
-    # A full recording has ~1950 windows; only read as many samples as the kept windows need
+    # A full steady-state recording (841,000 samples from sample 160,000) has 1,641 windows at 1024/512;
+    # only read as many samples as the kept windows need
     if max_windows is not None:
         df = df.iloc[: window_size +
                      (max_windows - 1) * (window_size - overlap)]

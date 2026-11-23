@@ -1,12 +1,12 @@
 """
 In this file, we have functions that are needed to create Mantis-based embeddings
-from time series windows of LIAS data.
+from time series windows. Not tied to a dataset.
 
-It mirrors `moment_embeddings_LIAS.py`: same input (one phase's list of windows),
+It mirrors `moment_embeddings.py`: same input (one phase's list of windows),
 same output (embeddings plus the matching metadata), so the rest of the pipeline
 can treat MOMENT and Mantis features the same way.
 
-The windows would usually be produced by the functions in `prepare_LIAS.py`.
+The windows would usually be produced by the functions in `prepare_LIAS.py` or `prepare_IEEE.py`.
 """
 from typing import List, Dict, Any, Tuple
 import numpy as np
@@ -14,8 +14,6 @@ import pandas as pd
 import torch
 from mantis.trainer import MantisTrainer
 
-# Number of features Mantis returns per window, per phase
-MANTIS_EMBEDDING_DIM = 256
 # Columns that identify a window; used to line the three phases up
 KEY_COLUMNS = ["file_name", "window_num"]
 
@@ -75,42 +73,6 @@ def embeddings_to_dataframe(embeddings: torch.Tensor,
     return pd.concat([metadata_df, embeddings_df], axis=1)
 
 
-def rename_and_merge(df_a: pd.DataFrame,
-                     df_b: pd.DataFrame,
-                     df_c: pd.DataFrame,
-                     n_features: int = MANTIS_EMBEDDING_DIM) -> pd.DataFrame:
-    """
-    Merges the Mantis embedding tables of phases A, B and C into one.
-
-    Renames the feature columns 0 to n_features-1 of each table to mantis_a_*,
-    mantis_b_* and mantis_c_*, then joins the tables on file_name and window_num.
-
-    Args:
-        df_a: Table for phase A, from `embeddings_to_dataframe`.
-        df_b: Table for phase B.
-        df_c: Table for phase C.
-        n_features: Number of feature columns per phase (256 for Mantis).
-
-    Returns:
-        One DataFrame: file_name, window_num, then 3 * n_features feature columns.
-    """
-    feature_columns = list(range(n_features))
-
-    df_a = df_a.rename(columns={col: f"mantis_a_{col}" for col in feature_columns})
-    df_b = df_b.rename(columns={col: f"mantis_b_{col}" for col in feature_columns})
-    df_c = df_c.rename(columns={col: f"mantis_c_{col}" for col in feature_columns})
-
-    df_merged = pd.merge(df_a, df_b, on=KEY_COLUMNS, how="outer")
-    df_merged = pd.merge(df_merged, df_c, on=KEY_COLUMNS, how="outer")
-
-    # all phases have the same windows, so any extra row means they did not line up
-    if not (len(df_merged) == len(df_a) == len(df_b) == len(df_c)):
-        raise ValueError(f"Phases do not have the same windows: {len(df_a)}, {len(df_b)}, "
-                         f"{len(df_c)} rows in, {len(df_merged)} rows after merging.")
-
-    return df_merged
-
-
 def main():
     if torch.backends.mps.is_available():
         device = "mps"
@@ -126,6 +88,7 @@ def main():
     OVERLAP = int(WINDOW_SIZE/2)
 
     from LIAS.prepare_LIAS import process_all_LIAS_files
+    from common.feature_merging import rename_and_merge
     from mantis.architecture import MantisV1
 
     network = MantisV1(device=device).from_pretrained("paris-noah/Mantis-8M")
@@ -147,7 +110,8 @@ def main():
 
     df_merged = rename_and_merge(embeddings_to_dataframe(embeddings_a, metadata_a),
                                  embeddings_to_dataframe(embeddings_b, metadata_b),
-                                 embeddings_to_dataframe(embeddings_c, metadata_c))
+                                 embeddings_to_dataframe(embeddings_c, metadata_c),
+                                 feature_type="mantis")
 
     # 2 key columns + 256 * 3 = 768 feature columns
     print(f"Shape of the merged DataFrame: {df_merged.shape}")

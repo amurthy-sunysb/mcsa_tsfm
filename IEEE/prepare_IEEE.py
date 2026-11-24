@@ -15,7 +15,7 @@ from common.windowing import create_overlapping_windows, downsample_data
 DOWNSAMPLE_FACTORS = {512: 1, 1024: 2, 2048: 4}
 
 
-def process_single_file(filename: str, class_label: str, window_size: int, overlap: int,
+def process_single_file(filename: str, window_size: int, overlap: int,
                         max_windows: int | None = None,
                         start_sample: int = STEADY_STATE_START) -> tuple[list[dict], list[dict], list[dict]]:
     """
@@ -24,7 +24,6 @@ def process_single_file(filename: str, class_label: str, window_size: int, overl
 
     Args:
         filename (str): The name of the CSV file to process.
-        class_label (str): Class of the recording (from labels.csv), copied into each window's metadata.
         window_size (int): The size of the overlapping windows.
         overlap (int): The number of samples by which windows overlap.
         max_windows (int | None): Keep only the first this-many windows per signal (None keeps all).
@@ -66,8 +65,7 @@ def process_single_file(filename: str, class_label: str, window_size: int, overl
                           "window_num": i,
                           "window_size": window_size,
                           "overlap": overlap,
-                          "signal_type": signal_type,
-                          "class": class_label}}
+                          "signal_type": signal_type}}
             for i, window in enumerate(raw_windows)
         ]
 
@@ -96,9 +94,7 @@ def process_all_IEEE_files(window_size: int, overlap: int,
     all_a, all_b, all_c = [], [], []
     for filename in tqdm(file_list, desc="Processing files"):
         a, b, c = process_single_file(
-            filename, load_IEEE_labels().loc[load_IEEE_labels()[
-                "file_name"] == filename, "class"].values[0],
-            window_size, overlap, max_windows, start_sample)
+            filename, window_size, overlap, max_windows, start_sample)
         all_a.extend(a)
         all_b.extend(b)
         all_c.extend(c)
@@ -115,6 +111,41 @@ def load_IEEE_labels() -> pd.DataFrame:
         load, repetition and class.
     """
     return pd.read_csv(IEEE_LABELS_PATH)
+
+
+def add_labels_IEEE(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Keeps only the windows of the IEEE files listed in labels.csv, and labels them.
+
+    The IEEE analogue of add_labels_LIAS(). Two columns are added: 'class'
+    (1 = healthy, 2-5 = 1-4 broken bars) and 'file_group' (condition and load,
+    e.g. 'r1b_torque05'), which train_test_split_LIAS() stratifies on.
+
+    Args:
+        df (pd.DataFrame): One row per window, with a 'file_name' column, e.g. the table
+            returned by rename_and_merge().
+
+    Returns:
+        pd.DataFrame: A copy of the rows of df that belong to the labelled files, with the
+        'class' and 'file_group' columns added.
+
+    Raises:
+        ValueError: If df has no 'file_name' column.
+    """
+    if "file_name" not in df.columns:
+        raise ValueError("df has no 'file_name' column.")
+
+    labels = load_IEEE_labels()
+    file_to_class_map = dict(zip(labels["file_name"], labels["class"]))
+    file_to_group_map = dict(zip(labels["file_name"], labels["condition"] + "_" + labels["load"]))
+
+    # Keep only the files whose condition we know, and label their windows
+    df_labelled = df[df["file_name"].isin(file_to_class_map)].copy()
+    df_labelled["class"] = df_labelled["file_name"].map(file_to_class_map)
+    df_labelled["file_group"] = df_labelled["file_name"].map(file_to_group_map)
+
+    print(f"Kept {df_labelled['file_name'].nunique()} labelled files ({len(df_labelled)} windows).")
+    return df_labelled
 
 
 def main():

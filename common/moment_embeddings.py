@@ -65,13 +65,9 @@ def embeddings_to_dataframe(embeddings: torch.Tensor,
 
 
 def main():
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
+    from common.device import get_device
 
+    device = get_device()
     print("Using device:", device)
 
     # A sample run
